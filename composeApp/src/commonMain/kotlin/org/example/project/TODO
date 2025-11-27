@@ -1,0 +1,8 @@
+- when task input, give output and a button to move forward to schedule rather than moving automatically
+
+- more flexible scheduling timetable. take the duration of task in consideration aswell so it matches the time user can choose. and remove the "suggested" from the selected
+    time, only put it to the requested time.
+
+- make calendar page view a month calendar
+
+- design more interactive ui, better coloring
