@@ -1,4 +1,3 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -8,6 +7,8 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinx.serialization)
+    alias(libs.plugins.sqldelight)
+    // Remove the kotlinCompose line - it's a duplicate
 }
 
 kotlin {
@@ -32,7 +33,10 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.android)
+            implementation(libs.sqldelight.android.driver)
+            implementation(libs.kotlinx.coroutines.android)
         }
+
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -47,7 +51,20 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.kotlinx.serialization.json)
+
+            // SQLDelight
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
+
+            // Coroutines
+            implementation(libs.kotlinx.coroutines.core)
         }
+
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.native.driver)
+        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
@@ -81,24 +98,34 @@ android {
             "\"${properties.getProperty("API_KEY", "")}\""
         )
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
-dependencies {
-    debugImplementation(compose.uiTooling)
-
+sqldelight {
+    databases {
+        create("AppDatabase") {
+            packageName.set("org.example.project.data")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.0.2")
+        }
+    }
 }
 
+dependencies {
+    debugImplementation(compose.uiTooling)
+}

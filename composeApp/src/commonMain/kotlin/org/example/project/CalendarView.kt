@@ -2,18 +2,11 @@ package org.example.project
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -23,17 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.delay
 
 data class TimeSlot(
     val startTime: LocalTime,
@@ -44,6 +34,10 @@ data class TimeSlot(
 
     fun overlaps(other: TimeSlot): Boolean {
         return startTime < other.endTime && endTime > other.startTime
+    }
+
+    companion object {
+        // Empty companion object for extension functions
     }
 }
 
@@ -62,23 +56,35 @@ fun CalendarView(
     onCancel: () -> Unit
 ) {
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var showTimePicker by remember { mutableStateOf(false) }
     var selectedTimeSlot by remember { mutableStateOf<TimeSlot?>(null) }
+
+    // When selectedDate changes, delay showing the time picker
+    LaunchedEffect(selectedDate) {
+        if (selectedDate != null) {
+            println("DEBUG: selectedDate changed to $selectedDate, delaying time picker...")
+            kotlinx.coroutines.delay(300)
+            println("DEBUG: Now showing time picker")
+            showTimePicker = true
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        if (selectedDate == null) "Valitse päivä" else "Valitse aika"
+                        if (!showTimePicker) "Choose day" else "Choose time"
                     )
                 },
                 navigationIcon = {
-                    if (selectedDate != null) {
+                    if (showTimePicker) {
                         IconButton(onClick = {
                             selectedDate = null
+                            showTimePicker = false
                             selectedTimeSlot = null
                         }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Takaisin")
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
@@ -96,6 +102,7 @@ fun CalendarView(
                     Row(
                         modifier = Modifier
                             .padding(16.dp)
+                            .padding(bottom = 32.dp)
                             .fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -105,7 +112,7 @@ fun CalendarView(
                         ) {
                             Icon(Icons.Default.Close, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Peruuta")
+                            Text("Decline")
                         }
                         Button(
                             onClick = { onConfirm(selectedTimeSlot!!) },
@@ -113,7 +120,7 @@ fun CalendarView(
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Vahvista")
+                            Text("Check")
                         }
                     }
                 }
@@ -134,16 +141,18 @@ fun CalendarView(
 
             Divider()
 
-            if (selectedDate == null) {
-                // Step 1: Show day picker
+            if (!showTimePicker) {
+                // Show day picker
                 DayPickerView(
                     suggestedDate = suggestedTimeSlot.date,
+                    selectedDate = selectedDate,
                     onDateSelected = { date ->
+                        println("DEBUG: Day selected: $date")
                         selectedDate = date
                     }
                 )
             } else {
-                // Step 2: Show time picker
+                // Show time picker
                 TimePickerView(
                     selectedDate = selectedDate!!,
                     taskDuration = suggestedTask.estimatedDuration,
@@ -161,6 +170,7 @@ fun CalendarView(
 @Composable
 fun DayPickerView(
     suggestedDate: LocalDate,
+    selectedDate: LocalDate?,
     onDateSelected: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
@@ -174,11 +184,19 @@ fun DayPickerView(
     ) {
         item {
             Text(
-                "Valitse päivä seuraavista:",
+                "Pick a day",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
+            // Debug text
+            if (selectedDate != null) {
+                Text(
+                    "Selected: ${selectedDate.format(DateTimeFormatter.ofPattern("d.M.yyyy"))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
 
         items(next7Days) { date ->
@@ -186,7 +204,11 @@ fun DayPickerView(
                 date = date,
                 isSuggested = date == suggestedDate,
                 isToday = date == today,
-                onClick = { onDateSelected(date) }
+                isSelected = date == selectedDate,
+                onClick = {
+                    println("DEBUG: Day clicked: $date")
+                    onDateSelected(date)
+                }
             )
         }
     }
@@ -197,20 +219,29 @@ fun DayCard(
     date: LocalDate,
     isSuggested: Boolean,
     isToday: Boolean,
+    isSelected: Boolean,
     onClick: () -> Unit
 ) {
     val dayName = date.format(DateTimeFormatter.ofPattern("EEEE", java.util.Locale("fi", "FI")))
     val dateStr = date.format(DateTimeFormatter.ofPattern("d.M.yyyy"))
+
+    // Animate the color change - ONLY show color when selected
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "cardColor"
+    )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSuggested)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surface
+            containerColor = backgroundColor
         )
     ) {
         Row(
@@ -240,10 +271,10 @@ fun DayCard(
                 if (isToday) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.secondary
+                        // color = MaterialTheme.colorScheme.secondary
                     ) {
                         Text(
-                            "Tänään",
+                            "Todasy",
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = MaterialTheme.colorScheme.onSecondary,
                             fontWeight = FontWeight.Bold,
@@ -257,7 +288,7 @@ fun DayCard(
                         color = MaterialTheme.colorScheme.primary
                     ) {
                         Text(
-                            "Ehdotettu",
+                            "Suggested",
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold,
@@ -280,7 +311,7 @@ fun TimePickerView(
 ) {
     val dateStr = selectedDate.format(DateTimeFormatter.ofPattern("EEEE d.M", java.util.Locale("fi", "FI")))
 
-    // Generate time slots every 30 minutes from 6:00 to 22:00
+    // Generate time slots every 30 minutes from 6:00 to 22:00. TO DO: IMPROVE
     val timeSlots = remember {
         val slots = mutableListOf<LocalTime>()
         var time = LocalTime.of(6, 0)
@@ -299,19 +330,19 @@ fun TimePickerView(
     ) {
         item {
             Text(
-                "Valitse kellonaika (${dateStr.replaceFirstChar { it.uppercase() }})",
+                "What o clock? (${dateStr.replaceFirstChar { it.uppercase() }})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Tehtävän kesto: $taskDuration min",
+                "Task duration: $taskDuration min",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Group times by hour for a clock-like display
+        // Group times by hour
         val groupedTimes = timeSlots.groupBy { it.hour }
 
         items(groupedTimes.keys.toList()) { hour ->
@@ -410,7 +441,7 @@ fun TimeChip(
                 )
                 if (isOccupied) {
                     Text(
-                        "Varattu",
+                        "Already scheduled",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -447,18 +478,18 @@ fun TaskSummaryCard(
             ) {
                 Column {
                     Text(
-                        "Kesto: ${task.estimatedDuration} min",
+                        "Duration: ${task.estimatedDuration} min",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        "Kuormitus: ${task.mentalLoad}",
+                        "Mental load: ${task.mentalLoad}",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
                 if (timeSlot != null) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            "Valittu aika:",
+                            "Chosen time:",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -482,7 +513,7 @@ fun suggestTimeSlot(task: TaskData): TimeSlot {
     val now = LocalDateTime.now()
     val today = now.toLocalDate()
 
-    // Suggest based on mental load
+    // Suggest based on mental load. Default settings, to be optimized with actual user data.
     val suggestedHour = when (task.mentalLoad.lowercase()) {
         "high" -> 9  // Morning for high mental load
         "medium" -> 14 // Early afternoon for medium

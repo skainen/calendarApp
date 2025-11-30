@@ -94,7 +94,7 @@ class TaskApiService {
         }
     }
 
-    // API_KEY in local.properties in form: API_KEY=your api key
+    // import API_KEY in local.properties
     private val apiKey = BuildConfig.API_KEY
 
     suspend fun analyzeTask(taskDescription: String): TaskData {
@@ -143,26 +143,26 @@ class TaskApiService {
 
     private fun buildPrompt(taskDescription: String): String {
         return """
-Analyze this task and extract structured information: "$taskDescription"
-
-Provide your analysis in this exact JSON format:
-{
-  "taskType": "one of: work, study, personal, household, creative, exercise, social",
-  "estimatedDuration": number in minutes (realistic estimate),
-  "mentalLoad": "low, medium, or high",
-  "deadline": "if mentioned, in format YYYY-MM-DD HH:mm, otherwise null",
-  "priority": number between 0.0 and 1.0,
-  "reasoning": "brief explanation of your analysis"
-}
-
-Consider:
-- Mental load: How much focus/energy does this require?
-- Duration: Be realistic - include breaks for longer tasks
-- Priority: Based on urgency, importance, and mental load
-- Task type: Categorize appropriately
-
-Respond ONLY with the JSON, no other text.
-        """.trimIndent()
+                Analyze this task and extract structured information: "$taskDescription"
+                
+                Provide your analysis in this exact JSON format:
+                {
+                  "taskType": "one of: work, study, personal, household, creative, exercise, social",
+                  "estimatedDuration": number in minutes (realistic estimate),
+                  "mentalLoad": "low, medium, or high",
+                  "deadline": "if mentioned, in format YYYY-MM-DD HH:mm, otherwise null",
+                  "priority": number between 0.0 and 1.0,
+                  "reasoning": "brief explanation of your analysis"
+                }
+                
+                Consider:
+                - Mental load: How much focus/energy does this require?
+                - Duration: Be realistic - include breaks for longer tasks
+                - Priority: Based on urgency, importance, and mental load
+                - Task type: Categorize appropriately
+                
+                Respond ONLY with the JSON, no other text.
+                """.trimIndent()
     }
 
     private fun parseTaskData(originalDescription: String, apiResponse: String): TaskData {

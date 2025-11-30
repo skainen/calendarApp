@@ -28,8 +28,6 @@ fun ChatScreen(
     var messages by remember { mutableStateOf(listOf<Message>()) }
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var pendingTask by remember { mutableStateOf<TaskData?>(null) }
-    var pendingSuggestedSlot by remember { mutableStateOf<TimeSlot?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -61,7 +59,7 @@ fun ChatScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     MessageBubble(
                         message = Message(
-                            content = "Mitäs sitten?",
+                            content = "Let us schedule",
                             isUser = false
                         )
                     )
@@ -69,19 +67,6 @@ fun ChatScreen(
 
                 items(messages) { message ->
                     MessageBubble(message = message)
-                }
-
-                // Show schedule button if we have a pending task
-                if (pendingTask != null && pendingSuggestedSlot != null) {
-                    item {
-                        ScheduleTaskButton(
-                            onClick = {
-                                onTaskAnalyzed(pendingTask!!, pendingSuggestedSlot!!)
-                                pendingTask = null
-                                pendingSuggestedSlot = null
-                            }
-                        )
-                    }
                 }
 
                 if (isLoading) {
@@ -106,7 +91,7 @@ fun ChatScreen(
                         value = inputText,
                         onValueChange = { inputText = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Kirjota tähän") },
+                        placeholder = { Text("Input here") },
                         enabled = !isLoading,
                         maxLines = 3
                     )
@@ -125,18 +110,23 @@ fun ChatScreen(
                                     listState.animateScrollToItem(messages.size)
                                 }
 
-                                // Process task with API
+                                // Process task and schedule
                                 isLoading = true
                                 processTask(
                                     taskDescription = userMessage,
                                     onResult = { response, task, slot ->
                                         messages = messages + Message(response, false)
-                                        pendingTask = task
-                                        pendingSuggestedSlot = slot
+                                        messages = messages + Message(
+                                            "✅ Task scheduled for ${slot.date.format(java.time.format.DateTimeFormatter.ofPattern("d.M.yyyy"))} at ${slot.startTime}",
+                                            false
+                                        )
                                         isLoading = false
+
+                                        // Auto-schedule the task
+                                        onTaskAnalyzed(task, slot)
+
                                         coroutineScope.launch {
-                                            // Scroll to show the button
-                                            listState.animateScrollToItem(messages.size + 1)
+                                            listState.animateScrollToItem(messages.size)
                                         }
                                     },
                                     onError = { error ->
@@ -215,7 +205,7 @@ fun ScheduleTaskButton(onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Valitse ajankohta",
+                "Pick a time",
                 style = MaterialTheme.typography.titleMedium
             )
         }
@@ -248,7 +238,7 @@ fun LoadingIndicator() {
     }
 }
 
-// Process task using API
+// Process task
 fun processTask(
     taskDescription: String,
     onResult: (String, TaskData, TimeSlot) -> Unit,
@@ -263,7 +253,7 @@ fun processTask(
 
             onResult(summary, taskData, suggestedSlot)
         } catch (e: Exception) {
-            onError("Sorry, I encountered an error: ${e.message}\n\nPlease try again or rephrase your task.")
+            onError("Error: ${e.message}\n\nTry again or rephrase task.")
         }
     }
 }
